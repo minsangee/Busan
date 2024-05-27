@@ -137,7 +137,7 @@ else {
         printf("zombie: stay %d\n\n", Zlo); // 좀비의 위치 유지 출력
     }
 //마동석 상태 출력 함수
-int Mdsmov(int Mlo) {
+int Mdsmov(int Mlo) { 
     if ()
 }
 
