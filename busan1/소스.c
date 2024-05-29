@@ -22,12 +22,20 @@
 #define ACTION_REST 0
 #define ACTION_PROVOKE 1
 #define ACTION_PULL 2
-
-// 인트로
+// 전역 변수 설정
+int len;
+int prob;
+int stm;
+int agro;
+int Clo;
+int Zlo;
+int Mlo;
+int count;
+// 인트로 함수
 void intro() {
     printf("부 산 행 I N T R O \n");
 }
-//열차 길이 설정
+// 열차 길이 설정
 int train() {
     int len;
     do {
@@ -37,7 +45,7 @@ int train() {
     } while (len < LEN_MIN || len > LEN_MAX);
     return len;
 }
-//확률 설정
+// 확률 설정
 int probability() {
     int prob;
     do {
@@ -68,14 +76,38 @@ int aggro() {
     return agro;
 }
 // 마동석 이동 함수
-int MDSmov(int Mlo, int command) {
-    if (command == MOVE_LEFT) {
-        Mlo--;
-    }
+int MDSmov() {
+    int command;
+    do {
+        printf("madongseok move(0.rest, 1.provoke)>> ");
+        scanf_s("%d", &command);
+        while (getchar() != '\n');
+
+        if (Mlo == Zlo - 1 || Mlo == Zlo + 1) { // 마동석과 좀비가 인접한 경우
+            printf("madongseok: cannot move, only rest (aggro: %d)\n", agro);
+            break;
+        }
+
+        if (command == ACTION_PROVOKE) {
+            if (Mlo > 0) {
+                Mlo--;
+                if (agro < AGGRO_MAX) agro += 1; // 어그로 증가
+                printf("madongseok: %d -> %d (aggro: %d)\n", Mlo + 1, Mlo, agro); // 마동석 위치 출력
+            }
+            break;
+        }
+        else if (command == ACTION_REST) {
+            if (agro > AGGRO_MIN) agro -= 1; // 어그로 감소
+            printf("madongseok: stay %d (aggro: %d)\n", Mlo, agro); // 마동석 위치 유지 출력
+            break;
+        }
+        else {
+            printf("\n");
+        }
+    } while (command != ACTION_REST && command != ACTION_PROVOKE);
     return Mlo;
 }
-
-// 열차와 시민, 좀비, 마동석의 위치를 출력하는 함수
+// 기차 생성 함수
 void printTrain(int len, int Clo, int Zlo, int Mlo) {
     for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < len; ++j) {
@@ -84,7 +116,7 @@ void printTrain(int len, int Clo, int Zlo, int Mlo) {
             }
             else if (i == 1) {
                 if (j == Mlo) {
-                    printf("M"); // 마동석 위치
+                    printf("M");
                 }
                 else if (j == Zlo) {
                     printf("Z");
@@ -103,25 +135,31 @@ void printTrain(int len, int Clo, int Zlo, int Mlo) {
         printf("\n");
     }
 }
-
-// 시민과 좀비의 상태를 출력하는 함수
-int Citizenmov(int Clo, int prob) {
+// 시민 움직임
+int Citizenmov() {
     int prevClo = Clo;
     if (rand() % 100 < (100 - prob)) {
         Clo--;
-    }
-    if (prevClo != Clo) {
-        printf("citizen: %d -> %d\n", prevClo, Clo);
+        if (agro < AGGRO_MAX) agro += 1; // 어그로 증가
     }
     else {
-        printf("citizen: stay %d\n", Clo);
+        if (agro > AGGRO_MIN) agro -= 1; // 어그로 감소
+    }
+    if (prevClo != Clo) {
+        printf("citizen: %d -> %d (aggro: %d)\n", prevClo, Clo, agro);
+    }
+    else {
+        printf("citizen: stay %d (aggro: %d)\n", Clo, agro);
     }
     return Clo;
 }
-// 좀비 상태 출력 함수
-int Zombimov(int Zlo, int prob, int count) {
+
+// 좀비 움직임
+int Zombimov() {
     int prevZlo = Zlo;
-    if (count % 2 != 0 && rand() % 100 < prob) {
+    // 어그로에 따른 이동 대상 결정
+    int targetLo = (agro >= 3 && Mlo < Clo) ? Mlo : Clo; 
+    if (count % 2 != 0 && rand() % 100 < prob && Zlo > targetLo) {
         Zlo--;
     }
 
@@ -130,53 +168,51 @@ int Zombimov(int Zlo, int prob, int count) {
     }
     else {
         if (prevZlo != Zlo) {
-            printf("zombie : %d -> %d\n\n", prevZlo, Zlo); // 좀비의 위치 변경 출력
+            printf("zombie : %d -> %d\n\n", prevZlo, Zlo);
         }
         else {
-            printf("zombie: stay %d\n\n", Zlo); // 좀비의 위치 유지 출력
+            printf("zombie: stay %d\n\n", Zlo);
         }
     }
     return Zlo;
 }
-// 게임 종료 조건을 확인하고 메시지를 출력하는 함수
+// 아웃트로
 void outro(int Clo, int Zlo) {
     if (Clo == 1) {
         printf("시민이 열차 끝에 도착했습니다. 시민이 열차를 탈출했습니다.\n");
-        exit(0); // 시민이 열차를 탈출한 경우 프로그램 종료
+        exit(0);
     }
     if (Zlo == Clo + 1) {
         printf("시민이 좀비에게 물렸습니다. 시민 사망.\n");
-        exit(0); // 좀비가 시민을 잡은 경우 프로그램 종료
+        exit(0);
     }
 }
+// 메인함수
 int main(void) {
     srand((unsigned int)time(NULL)); // 난수 생성 초기화
-    intro(); // 소개 메시지 출력
-    int len = train(); // 열차 길이 입력 받기
-    int prob = probability(); // 확률 입력 받기
-    int stm = MDSSTM(); // 마동석 체력 입력 받기
-    int agro = aggro(); // 어그로 입력 받기
-    int Clo = len - 6; // 초기 시민 위치 설정
-    int Zlo = len - 3; // 초기 좀비 위치 설정
-    int Mlo = len - 4; // 마동석 초기 위치 설정
-    int count = 0; // 이동 횟수 초기화
-    int command; // 마동석 이동 명령 함수
-
+    intro(); // 인트로 출력 후 유지(임의 설정)
+    len = train(); // 열차 길이 입력 받기
+    prob = probability(); // 확률 입력 받기
+    stm = MDSSTM(); // 마동석 체력 입력 받기
+    agro = aggro(); // 어그로 입력 받기
+    Clo = len - 6; // 초기 시민 위치 설정
+    Zlo = len - 3; // 초기 좀비 위치 설정
+    Mlo = len - 2; // 마동석 초기 위치 설정
+    count = 0; // 이동 횟수 초기화
     printTrain(len, Clo, Zlo, Mlo); // 초기 열차 상태 출력
     // 게임 루프
     while (1) {
-        printTrain(len, Clo, Zlo, Mlo); // 현재 열차 상태
-        printf("madongseok action(0.rest, 1.provoke)>> ");
-        scanf_s("%d", &command);
-        while (getchar() != "\n");
-        Mlo = MDSmov(Mlo, command);
-        Clo = Citizenmov(Clo, prob); // 시민 이동
-        Zlo = Zombimov(Zlo, prob, count); // 좀비 이동
+        // 현재 열차 상태 출력
+        printTrain(len, Clo, Zlo, Mlo);
+        Clo = Citizenmov(); // 시민 이동
+        Zlo = Zombimov(); // 좀비 이동
+        Mlo = MDSmov(); // 마동석 이동
         outro(Clo, Zlo); // 게임 종료 조건 확인
         count++; // 이동 횟수 증가
     }
     return 0;
 }
+
 // 일단 부산행 1처럼 진행 -> 이동 함수 이후 마동석 함수
 // 마동석은 0 or 1을 입력받아 이동 혹은 중지 가능
 // if 마동석 =< 시민 어그로 면 좀비는 시민쪽 아니면 반대쪽
