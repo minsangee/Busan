@@ -26,8 +26,8 @@
 int len;
 int prob;
 int stm;
-int Mgro;
-int Cgro;
+int Mgro = 1;
+int Cgro = 1;
 int Clo;
 int Zlo;
 int Mlo;
@@ -70,43 +70,39 @@ int MDSSTM() {
 int MDSmov() {
     int command;
     do {
-        printf("madongseok move(0.rest, 1.provoke)>> ");
+        printf("\nmadongseok move(0: stay, 1: left)>> ");
         scanf_s("%d", &command);
         while (getchar() != '\n');
 
-        if (Mlo == Zlo - 1 || Mlo == Zlo + 1) { // 마동석과 좀비가 인접한 경우
-            if (command == ACTION_REST) {
-                if (Mgro > AGGRO_MIN) Mgro -= 1; // 어그로 감소
-                if (Mgro < AGGRO_MIN) Mgro = AGGRO_MIN; // 어그로 최소값 유지
-                printf("madongseok: stay %d (aggro: %d, stamina: %d)\n", Mlo, Mgro, stm); // 마동석 위치 유지 출력
-            }
-            else {
-                Mgro -= 1;
-                if (Mgro < AGGRO_MIN) Mgro = AGGRO_MIN; // 어그로 최소값 유지
-                printf("madongseok: cannot move, only rest (aggro: %d, stamina: %d)\n", Mgro, stm);
-            }
-            break;
+        int prevMlo = Mlo; // 이전 위치 저장
+
+        // 마동석과 좀비가 인접하거나 같은 위치인 경우
+        if (Mlo == Zlo + 1) {
+            printf("마동석은 좀비와 인접해 있어 강제로 휴식을 취합니다.\n");
+            command = MOVE_STAY;
         }
 
-        if (command == ACTION_PROVOKE) {
+        if (command == MOVE_LEFT) {
             if (Mlo > 0) {
                 Mlo--;
                 if (Mgro < AGGRO_MAX) Mgro += 1; // 어그로 증가
-                printf("madongseok: %d -> %d (aggro: %d, stamina: %d)\n", Mlo + 1, Mlo, Mgro, stm); // 마동석 위치 출력
+                printf("madongseok: %d -> %d (aggro: %d, stamina: %d)\n\n", prevMlo, Mlo, Mgro, stm); // 마동석 위치 출력
             }
             break;
         }
-        else if (command == ACTION_REST) {
+        else if (command == MOVE_STAY) {
             if (Mgro > AGGRO_MIN) Mgro -= 1; // 어그로 감소
-            printf("madongseok: stay %d (aggro: %d)\n", Mlo, Mgro); // 마동석 위치 유지 출력
+            printf("madongseok: stay %d (aggro: %d, stamina: %d)\n\n", Mlo, Mgro, stm); // 마동석 위치 유지 출력
             break;
         }
         else {
             printf("\n");
         }
-    } while (command != ACTION_REST && command != ACTION_PROVOKE);
+    } while (command != MOVE_STAY && command != MOVE_LEFT);
     return Mlo;
 }
+
+
 // 기차 생성 함수
 void printTrain(int len, int Clo, int Zlo, int Mlo) {
     for (int i = 0; i < 3; ++i) {
@@ -138,53 +134,66 @@ void printTrain(int len, int Clo, int Zlo, int Mlo) {
 // 시민 움직임
 int Citizenmov() {
     int prevClo = Clo;
-    if (rand() % 100 < (100 - prob)) {
+    if (Clo != 1 && rand() % 100 < (100 - prob)) { // 시민이 열차의 시작점에 도착하지 않았고, 이동 확률에 따라
         Clo--;
     }
     if (prevClo != Clo) {
         if (Cgro < AGGRO_MAX) Cgro += 1; // 어그로 증가
         printf("citizen: %d -> %d (aggro: %d)\n", prevClo, Clo, Cgro);
     }
-    else if (prevClo == Clo) {
+    else {
         if (Cgro > AGGRO_MIN) Cgro -= 1; // 어그로 감소
-        printf("citizen: stay %d (aggro: %d)\n", Clo, Cgro);
+        printf("citizen: stay %d (aggro: %d)\n",Clo, Cgro); // 시민이 움직이지 않음
+    }
+    if ((Zlo - Clo) != 1) { // 좀비와 시민, 마동석 모두 인접하지 않은 경우
+        printf("citizen does nothing.\n");
     }
     return Clo;
 }
 // 좀비 움직임
 int Zombimov() {
-    int prevZlo = Zlo;
+    int prevZlo = Zlo; // 이전 좀비 위치 저장
+    int targetLo = Mgro > Cgro ? Mlo : Clo; // 어그로 수치에 따른 목표 위치 결정
 
-    // 어그로 수치에 따라 이동할 대상 결정
-    int targetLo;
-    // 수정된 부분: 마동석과 시민의 어그로를 비교하여 높은 쪽으로 이동 결정
-    if (Mgro >= Cgro) {
-        targetLo = Mlo; // 마동석의 어그로가 높거나 같으면 마동석 쪽으로 이동
-    }
-    else {
-        targetLo = Clo; // 시민의 어그로가 더 높으면 시민 쪽으로 이동
-    }
-
-    // 좀비의 이동 로직
-    if (count % 2 != 0) { // 좀비는 홀수 턴에만 움직임
-        if (Zlo < targetLo) {
-            Zlo++; // 대상이 좀비보다 오른쪽에 위치해 있으면 한 칸 오른쪽으로 이동
+    // 좀비가 마동석을 공격하는 경우
+    if (Mgro > Cgro && (Mlo - Zlo) == 1) {
+        printf("Zombie attacked madongseok (aggro: %d vs %d, madongseok stamina %d -> %d)\n", Cgro, Mgro, stm, stm-1);
+        stm -= 1;
+        if (stm == STM_MIN) {
+            printf("게임 오버. 마동석 사망.\n");
+            exit(0);
         }
+        return Zlo; // 좀비는 이동하지 않음
+    }
+
+    // 좀비 움직임 처리 (홀수 턴에만 움직임)
+    if (count % 2 != 0) {
+        // 대상이 좀비보다 오른쪽에 있으며 마동석과 겹치지 않는 경우
+        if (Zlo < targetLo && (Mlo - Zlo) != 1) {
+            Zlo++;
+        }
+        // 대상이 좀비보다 왼쪽에 있을 때
         else if (Zlo > targetLo) {
-            Zlo--; // 대상이 좀비보다 왼쪽에 위치해 있으면 한 칸 왼쪽으로 이동
+            Zlo--;
         }
-    }
-
-    if (count % 2 == 0) {
-        printf("zombie cannot move\n\n");
+        // 좀비의 위치가 변경되었다면, 이를 출력
+        if (prevZlo != Zlo) {
+            printf("zombie : %d -> %d\n", prevZlo, Zlo);
+        }
     }
     else {
-        if (prevZlo != Zlo) {
-            printf("zombie : %d -> %d\n\n", prevZlo, Zlo);
-        }
+        printf("zombie cannot move %d \n", Zlo);
     }
+
+    // 좀비와 시민, 마동석 모두 인접하지 않은 경우
+    if ((Zlo - Clo) != 1 && (Mlo - Zlo) != 1) {
+        printf("zombie attacked nobody.\n");
+    }
+
     return Zlo;
 }
+
+
 
 // 아웃트로
 void outro(int Clo, int Zlo) {
@@ -192,11 +201,18 @@ void outro(int Clo, int Zlo) {
         printf("시민이 열차 끝에 도착했습니다. 시민이 열차를 탈출했습니다.\n");
         exit(0);
     }
-    if (Zlo == Clo + 1) {
+    if (Zlo == Clo + 1) { // 시민이 좀비와 인접한 경우
         printf("시민이 좀비에게 물렸습니다. 시민 사망.\n");
         exit(0);
     }
+    if (abs(Zlo - Clo) == 1 && abs(Zlo - Mlo) == 1) { // 둘 다 인접한 경우
+        if (Cgro >= Mgro) { // 시민의 어그로가 더 높거나 같은 경우
+            printf("시민이 좀비에게 물렸습니다. 시민 사망.\n");
+            exit(0);
+        }
+    }
 }
+
 // 메인함수
 int main(void) {
     srand((unsigned int)time(NULL)); // 난수 생성 초기화
@@ -214,19 +230,21 @@ int main(void) {
         // 현재 열차 상태 출력
         printTrain(len, Clo, Zlo, Mlo);
 
+        int prevClo = Clo;
+        int prevZlo = Zlo;
+        int prevMlo = Mlo;
+
         Clo = Citizenmov(); // 시민 이동
         Zlo = Zombimov(); // 좀비 이동
+
+        // 변경된 부분만 출력
+        if (prevClo != Clo || prevZlo != Zlo) {
+            printTrain(len, Clo, Zlo, Mlo);
+        }
+
         Mlo = MDSmov(); // 마동석 이동 <- 여기 위치 변경
         outro(Clo, Zlo); // 게임 종료 조건 확인
         count++; // 이동 횟수 증가
     }
     return 0;
 }
-
-// 일단 부산행 1처럼 진행 -> 이동 함수 이후 마동석 함수
-// 마동석은 0 or 1을 입력받아 이동 혹은 중지 가능
-// if 마동석 =< 시민 어그로 면 좀비는 시민쪽 아니면 반대쪽
-// stm도 구현해서 입력받게 하기
-// 마동석 이동 행동 따로, 휴식 도발 붙들기 따로
-// 붙들기 if문 행동 성공시, 실패시 문구 출력
-// 
