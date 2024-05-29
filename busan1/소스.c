@@ -26,7 +26,8 @@
 int len;
 int prob;
 int stm;
-int agro;
+int Mgro;
+int Cgro;
 int Clo;
 int Zlo;
 int Mlo;
@@ -65,16 +66,6 @@ int MDSSTM() {
     } while (stm < STM_MIN || stm > STM_MAX);
     return stm;
 }
-// 어그로 설정
-int aggro() {
-    int agro;
-    do {
-        printf("어그로 설정(%d ~ %d)>> ", AGGRO_MIN, AGGRO_MAX);
-        scanf_s("%d", &agro);
-        while (getchar() != '\n');
-    } while (agro < AGGRO_MIN || agro > AGGRO_MAX);
-    return agro;
-}
 // 마동석 이동 함수
 int MDSmov() {
     int command;
@@ -84,21 +75,30 @@ int MDSmov() {
         while (getchar() != '\n');
 
         if (Mlo == Zlo - 1 || Mlo == Zlo + 1) { // 마동석과 좀비가 인접한 경우
-            printf("madongseok: cannot move, only rest (aggro: %d)\n", agro);
+            if (command == ACTION_REST) {
+                if (Mgro > AGGRO_MIN) Mgro -= 1; // 어그로 감소
+                if (Mgro < AGGRO_MIN) Mgro = AGGRO_MIN; // 어그로 최소값 유지
+                printf("madongseok: stay %d (aggro: %d, stamina: %d)\n", Mlo, Mgro, stm); // 마동석 위치 유지 출력
+            }
+            else {
+                Mgro -= 1;
+                if (Mgro < AGGRO_MIN) Mgro = AGGRO_MIN; // 어그로 최소값 유지
+                printf("madongseok: cannot move, only rest (aggro: %d, stamina: %d)\n", Mgro, stm);
+            }
             break;
         }
 
         if (command == ACTION_PROVOKE) {
             if (Mlo > 0) {
                 Mlo--;
-                if (agro < AGGRO_MAX) agro += 1; // 어그로 증가
-                printf("madongseok: %d -> %d (aggro: %d)\n", Mlo + 1, Mlo, agro); // 마동석 위치 출력
+                if (Mgro < AGGRO_MAX) Mgro += 1; // 어그로 증가
+                printf("madongseok: %d -> %d (aggro: %d, stamina: %d)\n", Mlo + 1, Mlo, Mgro, stm); // 마동석 위치 출력
             }
             break;
         }
         else if (command == ACTION_REST) {
-            if (agro > AGGRO_MIN) agro -= 1; // 어그로 감소
-            printf("madongseok: stay %d (aggro: %d)\n", Mlo, agro); // 마동석 위치 유지 출력
+            if (Mgro > AGGRO_MIN) Mgro -= 1; // 어그로 감소
+            printf("madongseok: stay %d (aggro: %d)\n", Mlo, Mgro); // 마동석 위치 유지 출력
             break;
         }
         else {
@@ -140,27 +140,39 @@ int Citizenmov() {
     int prevClo = Clo;
     if (rand() % 100 < (100 - prob)) {
         Clo--;
-        if (agro < AGGRO_MAX) agro += 1; // 어그로 증가
-    }
-    else {
-        if (agro > AGGRO_MIN) agro -= 1; // 어그로 감소
     }
     if (prevClo != Clo) {
-        printf("citizen: %d -> %d (aggro: %d)\n", prevClo, Clo, agro);
+        if (Cgro < AGGRO_MAX) Cgro += 1; // 어그로 증가
+        printf("citizen: %d -> %d (aggro: %d)\n", prevClo, Clo, Cgro);
     }
-    else {
-        printf("citizen: stay %d (aggro: %d)\n", Clo, agro);
+    else if (prevClo == Clo) {
+        if (Cgro > AGGRO_MIN) Cgro -= 1; // 어그로 감소
+        printf("citizen: stay %d (aggro: %d)\n", Clo, Cgro);
     }
     return Clo;
 }
-
 // 좀비 움직임
 int Zombimov() {
     int prevZlo = Zlo;
-    // 어그로에 따른 이동 대상 결정
-    int targetLo = (agro >= 3 && Mlo < Clo) ? Mlo : Clo; 
-    if (count % 2 != 0 && rand() % 100 < prob && Zlo > targetLo) {
-        Zlo--;
+
+    // 어그로 수치에 따라 이동할 대상 결정
+    int targetLo;
+    // 수정된 부분: 마동석과 시민의 어그로를 비교하여 높은 쪽으로 이동 결정
+    if (Mgro >= Cgro) {
+        targetLo = Mlo; // 마동석의 어그로가 높거나 같으면 마동석 쪽으로 이동
+    }
+    else {
+        targetLo = Clo; // 시민의 어그로가 더 높으면 시민 쪽으로 이동
+    }
+
+    // 좀비의 이동 로직
+    if (count % 2 != 0) { // 좀비는 홀수 턴에만 움직임
+        if (Zlo < targetLo) {
+            Zlo++; // 대상이 좀비보다 오른쪽에 위치해 있으면 한 칸 오른쪽으로 이동
+        }
+        else if (Zlo > targetLo) {
+            Zlo--; // 대상이 좀비보다 왼쪽에 위치해 있으면 한 칸 왼쪽으로 이동
+        }
     }
 
     if (count % 2 == 0) {
@@ -170,12 +182,10 @@ int Zombimov() {
         if (prevZlo != Zlo) {
             printf("zombie : %d -> %d\n\n", prevZlo, Zlo);
         }
-        else {
-            printf("zombie: stay %d\n\n", Zlo);
-        }
     }
     return Zlo;
 }
+
 // 아웃트로
 void outro(int Clo, int Zlo) {
     if (Clo == 1) {
@@ -194,7 +204,6 @@ int main(void) {
     len = train(); // 열차 길이 입력 받기
     prob = probability(); // 확률 입력 받기
     stm = MDSSTM(); // 마동석 체력 입력 받기
-    agro = aggro(); // 어그로 입력 받기
     Clo = len - 6; // 초기 시민 위치 설정
     Zlo = len - 3; // 초기 좀비 위치 설정
     Mlo = len - 2; // 마동석 초기 위치 설정
@@ -204,9 +213,10 @@ int main(void) {
     while (1) {
         // 현재 열차 상태 출력
         printTrain(len, Clo, Zlo, Mlo);
+
         Clo = Citizenmov(); // 시민 이동
         Zlo = Zombimov(); // 좀비 이동
-        Mlo = MDSmov(); // 마동석 이동
+        Mlo = MDSmov(); // 마동석 이동 <- 여기 위치 변경
         outro(Clo, Zlo); // 게임 종료 조건 확인
         count++; // 이동 횟수 증가
     }
