@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <Windows.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -95,6 +94,50 @@ void printTrain(int len, int Clo, int Zlo, int Mlo) {
         printf("\n");
     }
 }
+// 좀비의 이동 함수
+int Zombimov() {
+    if (Zpull) {
+        printf("zombie cannot move this turn.\n");
+        Zpull = 0; // 다음 턴에 좀비가 다시 움직일 수 있도록 설정
+        return Zlo;
+    }
+    int prevZlo = Zlo; // 이전 좀비 위치 저장
+    int targetLo = Mgro > Cgro ? Mlo : Clo; // 어그로 수치에 따른 목표 위치 결정
+    if (count % 2 != 0) {
+        if (Zlo < targetLo && (Mlo - Zlo) != 1) {
+            Zlo++;
+        }
+        else if (Zlo > targetLo) {
+            Zlo--;
+        }
+        // 좀비의 위치가 변경되었다면, 이를 출력
+        if (prevZlo != Zlo) {
+            printf("zombie : %d -> %d\n", prevZlo, Zlo);
+        }
+    }
+    else {
+        printf("zombie cannot move %d \n", Zlo);
+    }
+    return Zlo;
+}
+// 좀비의 공격 함수
+void zombieAction() {
+    if (Mlo == Zlo + 1) { // 인접한 경우
+        // 좀비 공격
+        printf("zombie attacked madongseok (aggro: %d vs %d, madongseok stamina %d -> ", Cgro, Mgro, stm);
+        if (stm == 0) {
+            printf("0)\n");
+        }
+        else {
+            printf("%d -> %d)\n", stm, stm - 1);
+        }
+        stm -= 1;
+        if (stm <= STM_MIN) {
+            printf("게임 오버. 마동석 사망.\n");
+            exit(0);
+        }
+    }
+}
 // 마동석 이동 함수
 int MDSmov() {
     int command;
@@ -104,35 +147,31 @@ int MDSmov() {
         printf("\nmadongseok move(0: stay, 1: left)>> ");
         scanf_s("%d", &command);
         while (getchar() != '\n');
-        int prevMlo = Mlo; // 이전 위치 저장
-
-        // 마동석과 좀비가 인접하거나 같은 위치인 경우
+        int prevMlo = Mlo; 
+        // 마동석과 좀비가 인접하거나 같은 위치인 경우 강제 휴식
         if (Mlo == Zlo + 1) {
             printf("마동석은 좀비와 인접해 있어 강제로 휴식을 취합니다.\n");
             command = MOVE_STAY;
         }
-
         if (command == MOVE_LEFT) {
             if (Mlo > 0) {
                 Mlo--;
                 if (Mgro < AGGRO_MAX) Mgro += 1; // 어그로 증가
-                printf("madongseok: %d -> %d (aggro: %d -> %d, stamina: %d)\n\n", prevMlo, Mlo, prevMgro, Mgro, stm); // 마동석 위치 출력
+                printf("madongseok: %d -> %d (aggro: %d -> %d, stamina: %d)\n\n", prevMlo, Mlo, prevMgro, Mgro, stm);
             }
             break;
         }
         else if (command == MOVE_STAY) {
             if (Mgro > AGGRO_MIN) Mgro -= 1; // 어그로 감소
-            printf("madongseok: stay %d (aggro: %d -> %d, stamina: %d)\n\n", Mlo, prevMgro, Mgro, stm); // 마동석 위치 유지 출력
+            printf("madongseok: stay %d (aggro: %d -> %d, stamina: %d)\n\n", Mlo, prevMgro, Mgro, stm);
             break;
         }
         else {
             printf("\n");
         }
     } while (command != MOVE_STAY && command != MOVE_LEFT);
-
     // 이동 후 열차 상태 출력
     printTrain(len, Clo, Zlo, Mlo);
-
     return Mlo;
 }
 // 마동석 행동 함수
@@ -140,13 +179,11 @@ void MDSaction() {
     int command;
     int prevMgro = Mgro;
     int prevstm = stm;
-
     if (Mlo == Zlo + 1) { // 인접한 경우
         do {
             printf("\nmadongseok action(0: rest, 1: provoke, 2: pull)>> ");
             scanf_s("%d", &command);
             while (getchar() != '\n');
-
             if (command == ACTION_REST) {
                 if (Mgro > AGGRO_MIN) Mgro -= 1; // 어그로 감소
                 if (stm < STM_MAX) stm += 1; // 체력 증가
@@ -173,12 +210,11 @@ void MDSaction() {
             }
         } while (command != ACTION_REST && command != ACTION_PROVOKE && command != ACTION_PULL);
     }
-    else { // 인접하지 않은 경우
+    else { // 인접하지 않은 경우 pull 삭제된 선택지 출력
         do {
             printf("\nmadongseok action(0: rest, 1: provoke)>> ");
             scanf_s("%d", &command);
             while (getchar() != '\n');
-
             if (command == ACTION_REST) {
                 if (Mgro > AGGRO_MIN) Mgro -= 1; // 어그로 감소
                 if (stm < STM_MAX) stm += 1; // 체력 증가
@@ -192,11 +228,11 @@ void MDSaction() {
         } while (command != ACTION_REST && command != ACTION_PROVOKE);
     }
 }
-
+// 시민 이동 함수(시민 행동 함수는 만들지 않음)
 int Citizenmov() {
     int prevClo = Clo;
     int prevCgro = Cgro;
-    if (Clo != 1 && rand() % 100 < (100 - prob)) { // 시민이 열차의 시작점에 도착하지 않았고, 이동 확률에 따라
+    if (Clo != 1 && rand() % 100 < (100 - prob)) { 
         Clo--;
     }
     if (prevClo != Clo) {
@@ -214,57 +250,7 @@ int Citizenmov() {
     }
     return Clo;
 }
-// 좀비 움직임
-int Zombimov() {
-    if (Zpull) {
-        printf("zombie cannot move this turn.\n");
-        Zpull = 0; // 다음 턴에 좀비가 다시 움직일 수 있도록 설정
-        return Zlo;
-    }
-
-    int prevZlo = Zlo; // 이전 좀비 위치 저장
-    int targetLo = Mgro > Cgro ? Mlo : Clo; // 어그로 수치에 따른 목표 위치 결정
-
-    // 좀비가 마동석을 공격하는 경우
-    if (Mgro > Cgro && (Mlo - Zlo) == 1) {
-        printf("Zombie attacked madongseok (aggro: %d vs %d, madongseok stamina %d -> %d)\n", Cgro, Mgro, stm, stm - 1);
-        stm -= 1;
-        if (stm <= STM_MIN) { // 체력이 0 이하일 경우 게임 종료
-            printf("게임 오버. 마동석 사망.\n");
-            exit(0);
-        }
-        return Zlo; // 좀비는 이동하지 않음
-    }
-    // 좀비 움직임 처리 (홀수 턴에만 움직임)
-    if (count % 2 != 0) {
-        // 대상이 좀비보다 오른쪽에 있으며 마동석과 겹치지 않는 경우
-        if (Zlo < targetLo && (Mlo - Zlo) != 1) {
-            Zlo++;
-        }
-        // 대상이 좀비보다 왼쪽에 있을 때
-        else if (Zlo > targetLo) {
-            Zlo--;
-        }
-        // 좀비의 위치가 변경되었다면, 이를 출력
-        if (prevZlo != Zlo) {
-            printf("zombie : %d -> %d\n", prevZlo, Zlo);
-        }
-    }
-    else {
-        printf("zombie cannot move %d \n", Zlo);
-    }
-
-    // 좀비와 시민, 마동석 모두 인접하지 않은 경우
-    if ((Zlo - Clo) != 1 && (Mlo - Zlo) != 1) {
-        printf("zombie attacked nobody.\n");
-    }
-
-    return Zlo;
-}
-
-
-
-// 아웃트로
+// 시민 사망 혹은 생존시 출력되는 아웃트로
 void outro(int Clo, int Zlo) {
     if (Clo == 1) {
         printf("!!!YOU WIN!!!\n");
@@ -281,7 +267,6 @@ void outro(int Clo, int Zlo) {
         }
     }
 }
-
 // 메인함수
 int main(void) {
     srand((unsigned int)time(NULL)); // 난수 생성 초기화
@@ -306,16 +291,14 @@ int main(void) {
         Clo = Citizenmov(); // 시민 이동
         Zlo = Zombimov(); // 좀비 이동
 
-        // 변경된 부분만 출력
         if (prevClo != Clo || prevZlo != Zlo) {
             printTrain(len, Clo, Zlo, Mlo);
         }
 
         Mlo = MDSmov(); // 마동석 이동
+        zombieAction(); // 마동석 이동 후에 좀비의 공격 발생
         MDSaction(); // 마동석 행동
         outro(Clo, Zlo); // 게임 종료 조건 확인
         count++; // 이동 횟수 증가
     }
-    return 0;
 }
-
